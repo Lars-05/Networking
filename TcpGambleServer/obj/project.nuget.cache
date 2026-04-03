@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "DcB1aHelZTU=",
+  "dgSpecHash": "CoRIYIMdh9U=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Lars\\Downloads\\IndividualProjectStartingCode\\TcpGambleServer\\TcpEchoServerPolling.csproj",
+  "projectFilePath": "C:\\Users\\Lars\\Unity Projects\\Networking\\TcpGambleServer\\TcpEchoServerPolling.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

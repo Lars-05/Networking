@@ -51,6 +51,9 @@ public class IncomingServerCommunicator : MonoBehaviour
     
     void HandleIncomingValue(string message)
     {
+        
+        //SCORE_70/20
+        //ID_2
         string[] messageParts = message.Split('_');
         switch (messageParts[0])
         {
