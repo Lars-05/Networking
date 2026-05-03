@@ -27,7 +27,7 @@ public class GameManager : MonoBehaviour
         EventBus.OnGameStart += OnGameStart;
         EventBus.OnShowResults += OnShowResult;
         EventBus.OnHit += OnHit;
-        EventBus.OnStand += OnStand;
+        EventBus.OnStand += OnStand;  
     }
     
     private void OnGameStop()

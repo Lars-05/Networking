@@ -19,8 +19,7 @@ public class TextClient : MonoBehaviour
     private bool connected = false;
 
     private CancellationTokenSource cancellationTokenSource;
-
-    // Thread-safe queue for messages coming from background thread
+    
     private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
 
     void Start()
@@ -60,7 +59,7 @@ public class TextClient : MonoBehaviour
             serverConnectionStatus = "Connected";
             Debug.Log("Connected to server");
 
-            // Start background receive loop
+           
             _ = Task.Run(() => ReceiveLoop(token), token);
         }
         catch (Exception e)
@@ -80,7 +79,7 @@ public class TextClient : MonoBehaviour
         {
             while (!token.IsCancellationRequested && client != null && client.Connected)
             {
-                string message = reader.ReadLine(); // blocking, but OK here (background thread)
+                string message = reader.ReadLine(); 
 
                 if (!string.IsNullOrEmpty(message))
                 {
@@ -93,7 +92,7 @@ public class TextClient : MonoBehaviour
             Debug.LogWarning("Disconnected: " + e.Message);
         }
 
-        // Connection lost → trigger reconnect
+
         connected = false;
         Cleanup();
         serverConnectionStatus = "Disconnected, retrying...";
@@ -101,7 +100,7 @@ public class TextClient : MonoBehaviour
 
     void Update()
     {
-        // Process messages safely on main thread
+     
         while (messageQueue.TryDequeue(out string message))
         {
             incomingServerCommunicator.HandleIncomingMessage(message);

@@ -8,34 +8,20 @@ public class ThisPlayerActionManager : MonoBehaviour
     [SerializeField] private Button readyButton;
     [SerializeField] private Button standButton;
     [SerializeField] private Button hitButton;
+
     [SerializeField] private TextMeshProUGUI scoreText;
+    [SerializeField] private TextMeshProUGUI readyButtonText;
+    [SerializeField] private TextMeshProUGUI cardValueText;
+
     [SerializeField] private Transform cardParent;
     [SerializeField] private GameObject cardPrefab;
 
     private int score;
-    private List<GameObject> cards = new();
     private bool isReady;
-
-    public void Setup()
-    {
-        
-        readyButton.gameObject.SetActive(true);
-        standButton.gameObject.SetActive(false);
-        hitButton.gameObject.SetActive(false);
-        scoreText.gameObject.SetActive(false);
-
-        readyButton.interactable = true;
-        hitButton.interactable = false;
-        standButton.interactable = false;
-        score = 0;
-    }
+    private List<GameObject> cards = new();
 
     private void OnEnable()
     {
-        EventBus.OnIsTurn += OnTurn;
-        EventBus.OnGameStart += OnGameStart;
-        EventBus.OnTurnOver += OnTurnOver;
-
         hitButton.onClick.AddListener(OnHit);
         standButton.onClick.AddListener(OnStand);
         readyButton.onClick.AddListener(ReadyButtonClicked);
@@ -43,38 +29,47 @@ public class ThisPlayerActionManager : MonoBehaviour
 
     private void OnDisable()
     {
-        EventBus.OnIsTurn -= OnTurn;
-        EventBus.OnGameStart -= OnGameStart;
-        EventBus.OnTurnOver -= OnTurnOver;
-        
         hitButton.onClick.RemoveListener(OnHit);
         standButton.onClick.RemoveListener(OnStand);
         readyButton.onClick.RemoveListener(ReadyButtonClicked);
     }
 
-    private void ReadyButtonClicked()
+    public void Setup()
     {
-        isReady = !isReady;
+        readyButton.gameObject.SetActive(true);
+        standButton.gameObject.SetActive(false);
+        hitButton.gameObject.SetActive(false);
+        scoreText.gameObject.SetActive(false);
 
-        if (isReady)
-        {
-            EventBus.RaiseSendCommandToServer(
-                OutgoingServerCommunicator.ClientCommands.IS_READY);
-            return;
-        }
+        readyButtonText.text = "Status: Unready";
+        readyButton.interactable = true;
 
-        EventBus.RaiseSendCommandToServer(
-            OutgoingServerCommunicator.ClientCommands.IS_NOT_READY);
+        hitButton.interactable = false;
+        standButton.interactable = false;
+
+        score = 0;
     }
 
-    public void ClearDeck()
+    public void OnGameStart()
     {
-        foreach (var card in cards)
-        {
-            Destroy(card);
-        }
+        readyButton.gameObject.SetActive(false);
+        standButton.gameObject.SetActive(true);
+        hitButton.gameObject.SetActive(true);
 
-        cards.Clear();
+        standButton.interactable = false;
+        hitButton.interactable = false;
+    }
+
+    public void OnTurnStart()
+    {
+        standButton.interactable = true;
+        hitButton.interactable = true;
+    }
+
+    public void OnTurnOver()
+    {
+        standButton.interactable = false;
+        hitButton.interactable = false;
     }
 
     public void AddCardToDeck(Sprite cardSprite)
@@ -101,42 +96,22 @@ public class ThisPlayerActionManager : MonoBehaviour
         }
     }
 
-    private void OnGameStart()
+    public void ClearDeck()
     {
-        readyButton.gameObject.SetActive(false);
-        standButton.gameObject.SetActive(true);
-        hitButton.gameObject.SetActive(true);
+        foreach (var card in cards)
+        {
+            Destroy(card);
+        }
 
-        standButton.interactable = false;
-        hitButton.interactable = false;
-    }
-
-    private void OnTurn()
-    {
-        standButton.interactable = true;
-        hitButton.interactable = true;
-    }
-
-    private void OnTurnOver()
-    {
-        standButton.interactable = false;
-        hitButton.interactable = false;
-    }
-
-    private void OnHit()
-    {
-        EventBus.RaiseOnHit();
-    }
-
-    private void OnStand()
-    {
-        EventBus.RaiseOnStand();
+        cards.Clear();
     }
 
     public void AddScore(int pScore)
     {
         score = pScore;
+        cardValueText.text = "Deck Value: " + score;
     }
+
     public void ShowScore(bool isHighestScore)
     {
         hitButton.gameObject.SetActive(false);
@@ -152,5 +127,35 @@ public class ThisPlayerActionManager : MonoBehaviour
         ClearDeck();
         Setup();
         isReady = false;
+    }
+
+    private void ReadyButtonClicked()
+    {
+        isReady = !isReady;
+
+        if (isReady)
+        {
+            EventBus.RaiseSendCommandToServer(
+                OutgoingServerCommunicator.ClientCommands.IS_READY);
+            readyButtonText.text = "Status: Ready";
+            return;
+        }
+
+        EventBus.RaiseSendCommandToServer(
+            OutgoingServerCommunicator.ClientCommands.IS_NOT_READY);
+
+        readyButtonText.text = "Status: Unready";
+    }
+
+    private void OnHit()
+    {
+        EventBus.RaiseSendCommandToServer(
+            OutgoingServerCommunicator.ClientCommands.HIT);
+    }
+
+    private void OnStand()
+    {
+        EventBus.RaiseSendCommandToServer(
+            OutgoingServerCommunicator.ClientCommands.STAND);
     }
 }

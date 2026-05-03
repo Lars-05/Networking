@@ -6,16 +6,16 @@ public class OtherPlayerManager : MonoBehaviour
 {
     [SerializeField] private GameObject playerDisplayerUIPrefab;
     [SerializeField] private Transform parent;
-    private Dictionary<int, PlayerActionDisplayer> playerActionDisplayers = new Dictionary<int, PlayerActionDisplayer>();
+    private Dictionary<int, EnemyActionDisplayer> playerActionDisplayers = new Dictionary<int, EnemyActionDisplayer>();
 
     void AddPlayer(int pID)
     {
-        PlayerActionDisplayer newPlayerDisplayerAction = Instantiate(playerDisplayerUIPrefab, parent).GetComponent<PlayerActionDisplayer>();
-        playerActionDisplayers.Add(pID, newPlayerDisplayerAction);
-        newPlayerDisplayerAction.SetupPlayer(pID);
+        EnemyActionDisplayer newEnemyDisplayerAction = Instantiate(playerDisplayerUIPrefab, parent).GetComponent<EnemyActionDisplayer>();
+        playerActionDisplayers.Add(pID, newEnemyDisplayerAction);
+        newEnemyDisplayerAction.SetupPlayer(pID);
     }
 
-    public PlayerActionDisplayer GetPlayerDisplayer(int pID)
+    public EnemyActionDisplayer GetPlayerDisplayer(int pID)
     {
         foreach (int ids in playerActionDisplayers.Keys)
         {

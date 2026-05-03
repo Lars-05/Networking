@@ -14,6 +14,11 @@ class MimicServerEditor : Editor
             mimicServer.SendMessageToClient(mimicServer.CommandToSend); 
             Debug.Log("Mimic'd sending to client " + mimicServer.CommandToSend);
         }
+        if (GUILayout.Button("Send Value Command"))
+        {
+            mimicServer.SendValueToClient(mimicServer.ValueToSend); 
+            Debug.Log("Mimic'd sending to client " + mimicServer.ValueToSend);
+        }
     }
 }
 
