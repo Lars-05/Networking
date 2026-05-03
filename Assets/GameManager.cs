@@ -26,7 +26,8 @@ public class GameManager : MonoBehaviour
         EventBus.OnForceGameStop += OnForceStop;
         EventBus.OnGameStart += OnGameStart;
         EventBus.OnShowResults += OnShowResult;
-        //EventBus.OnGameStop += OnGameStop;
+        EventBus.OnHit += OnHit;
+        EventBus.OnStand += OnStand;
     }
     
     private void OnGameStop()
@@ -89,15 +90,12 @@ public class GameManager : MonoBehaviour
 
     private void OnHit()
     {
-        RollRandomNumber();
-        pointsText.text = points.ToString();
-        if (points >= 21)
-            StopTurn();
+        
     }
 
     private void OnStand()
     {
-        StopTurn();
+        
     }
 
     private void StopTurn()
@@ -106,7 +104,7 @@ public class GameManager : MonoBehaviour
         hitButton.interactable = false;
         standButton.interactable = false;
         blackjackUI.gameObject.SetActive(false);
-        EventBus.RaiseSendCommandToServer(OutgoingServerCommunicator.ClientCommands.TURN_DONE);
+ 
     }
     
     private void OnForceStop()

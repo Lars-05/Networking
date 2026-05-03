@@ -19,7 +19,7 @@ public class CardManager : MonoBehaviour
     [SerializeField] private Sprite[] jokers;//12
     [SerializeField] private Sprite[] hiddenCards;//13
 
-    private List<Sprite[]> cardSets;
+    private List<Sprite[]> cardSets = new List<Sprite[]>();
 
     void Awake()
     {

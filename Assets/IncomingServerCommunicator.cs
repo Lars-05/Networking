@@ -2,8 +2,11 @@ using UnityEngine;
 
 public class IncomingServerCommunicator : MonoBehaviour
 {
+    [SerializeField] private PlayerManager playerManager;
+    public string lastIncomingMessage;
     public void HandleIncomingMessage(string message)
     {
+        lastIncomingMessage = message;
         string lastString = message[message.Length - 1].ToString();
 
         if (!int.TryParse(lastString, out int result))
@@ -23,23 +26,20 @@ public class IncomingServerCommunicator : MonoBehaviour
                 EventBus.RaiseOnIsTurn();
                 break;
             
-            case "GAME_START":
-                EventBus.RaiseOnGameStart();
-                break;
-            
-            case "WAITING_FOR_PLAYER_TURN":
-                EventBus.RaiseOnWaitingForPlayerTurn();
-                break;
-            
-            case "SHOW_RESULTS":
+            case "TURN_OVER":
+                EventBus.RaiseOnTurnOver();
                 break;
             
             case "FORCE_GAME_STOP":
-                EventBus.RaiseForceGameStop();
+                playerManager.ResetAllPlayers();
             break;
             
-            case "GAME_STOP":
-                EventBus.RaiseOnGameStop();
+            case "SHOW_RESULTS":
+                playerManager.ShowAllPlayerScores();
+                break;
+            
+            case "STOP_GAME":
+                playerManager.ResetAllPlayers();
                 break;
             
             default:
@@ -51,20 +51,39 @@ public class IncomingServerCommunicator : MonoBehaviour
     
     void HandleIncomingValue(string message)
     {
-        
-        //SCORE_70/20
         //ID_2
+        int value = 0;
         string[] messageParts = message.Split('_');
         switch (messageParts[0])
         {
-            case "ID":
-                int value = int.Parse(messageParts[1]);
-                PlayerData.ID = value;
+            case "THISID":
+                // example format = THISID_2
+                value = int.Parse(messageParts[1]);
+                PlayerData.SetPlayerID(value);
+                playerManager.SetupThisPlayer();
+                break;
+            
+            case "ENEMYID":
+                // example format = ENEMYID_2
+                value = int.Parse(messageParts[1]);
+
+                if (playerManager.playerActionDisplayers.ContainsKey(value) || value == PlayerData.id)
+                {
+                    return;
+                }
+                playerManager.AddPlayer(value);
                 break;
             
             case "SCORE":
-                string[] scores = messageParts[1].Split('/');
-                EventBus.RaiseOnRecieveResult(int.Parse(scores[0]), int.Parse(scores[1]));
+                // example format = SCORE_1_14
+                playerManager.AddPlayerScore(int.Parse(messageParts[1]), int.Parse(messageParts[2]));
+                break;
+            
+            case "CARD":
+                // example format = ENEMY_1_5
+                int id = int.Parse(messageParts[1]);
+                int cardValue = int.Parse(messageParts[2]);
+                playerManager.AddCardToPlayerDeck(id, cardValue);
                 break;
             
             default:

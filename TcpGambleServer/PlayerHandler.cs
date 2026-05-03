@@ -5,18 +5,28 @@ using System.Text;
 public class PlayerHandler
 {
     private readonly TcpServer server;
-    private readonly OutgoingMessageHandler outgoingMessageHandler;
-  
+
+
+    private OutgoingMessageHandler outgoingMessageHandler;
 
     private int lobbySize = 2;
+    private readonly object playerLock = new object();
+    private int nextPlayerId = 1;
 
     public List<Player> players = new();
 
     public PlayerHandler(TcpServer pServer, OutgoingMessageHandler pOutgoingMessageHandler)
     {
-        this.server = pServer;
-        this.outgoingMessageHandler = pOutgoingMessageHandler;
+        server = pServer;
+        outgoingMessageHandler = pOutgoingMessageHandler;
     }
+
+
+    public void SetOutgoing(OutgoingMessageHandler outgoing)
+    {
+        this.outgoingMessageHandler = outgoing;
+    }
+
 
     public void AcceptNewClients(TcpListener listener)
     {
@@ -25,67 +35,141 @@ public class PlayerHandler
 
         TcpClient newClient = listener.AcceptTcpClient();
 
-        if (players.Count >= lobbySize)
+        Player player;
+
+        lock (playerLock)
         {
-            RejectClient(newClient);
-            return;
-        }
-
-        var player = new Player(players.Count + 1, newClient);
-        players.Add(player);
-
-        outgoingMessageHandler.SendMessageToPlayer(
-            player,
-            "ID_" + player.ID
-        );
-
-        Console.WriteLine("Client connected");
-
-        if (players.Count == lobbySize)
-        {
-            server.currentGameState =
-                TcpServer.GameState.WAITING_ALL_PLAYERS_READY;
-        }
-    }
-
-    public void RejectClient(TcpClient client)
-    {
-        byte[] data = Encoding.UTF8.GetBytes("MATCH_FULL\n");
-
-        client.GetStream().Write(data, 0, data.Length);
-        client.Close();
-    }
-
-    public void CleanupClients()
-    {
-        for (int i = players.Count - 1; i >= 0; i--)
-        {
-            if (!IsClientConnected(players[i]))
+            if (players.Count >= lobbySize || server.gameSession == TcpServer.GameSession.INPROGRESS)
             {
-                players[i].tcpClient.Close();
-                players.RemoveAt(i);
+                RejectClient(newClient);
+                return;
+            }
 
-                Console.WriteLine("Disconnected client removed");
+            player = new Player(nextPlayerId++, newClient);
+            players.Add(player);
 
-                if (server.gameSession ==
-                    TcpServer.GameSession.INPROGRESS)
-                {
-                    OnAbruptDisconnect();
-                }
+            Console.WriteLine($"Client connected (Player {player.ID})");
+
+            if (players.Count == lobbySize)
+            {
+                server.currentGameState =
+                    TcpServer.GameState.WAITING_ALL_PLAYERS_READY;
+            }
+        }
+
+
+        outgoingMessageHandler?.ValueHandler(
+            TcpServer.ValueTypes.THISID,
+            player,
+            player.ID
+        );
+    }
+
+    public void SetAndUpdatePlayersOfPlayerState(Player pPlayer, PlayerStates pState)
+    {
+        pPlayer.PlayerState = pState;
+        foreach (var player in GetPlayersSnapshot())
+        {
+            switch (pState)
+            {
+                case PlayerStates.IDLE:
+                    break;
+
+                case PlayerStates.IS_READY:
+                    outgoingMessageHandler.ValueHandler(
+                        TcpServer.ValueTypes.READY, player, pPlayer.ID
+                    );
+                    break;
+
+                case PlayerStates.IS_NOT_READY:
+                    outgoingMessageHandler.ValueHandler(
+                        TcpServer.ValueTypes.UNREADY, player, pPlayer.ID
+                    );
+                    break;
+
+                case PlayerStates.PLAYING_TURN:
+                    outgoingMessageHandler.ValueHandler(
+                        TcpServer.ValueTypes.STARTTURN, player, pPlayer.ID
+                    );
+                    break;
+
+                case PlayerStates.WAITING_FOR_TURN:
+                    outgoingMessageHandler.ValueHandler(
+                        TcpServer.ValueTypes.ENDTURN, player, pPlayer.ID
+                    );
+                    break;
+
+                case PlayerStates.OUT:
+                    outgoingMessageHandler.ValueHandler(
+                        TcpServer.ValueTypes.OUT, player, pPlayer.ID
+                    );
+                    break;
             }
         }
     }
+
+    public List<Player> GetPlayersSnapshot()
+    {
+        lock (playerLock)
+        {
+            return players.ToList();
+        }
+    }
+
+
+
+    public void CleanupClients()
+    {
+        bool gameShouldStop = false;
+
+        lock (playerLock)
+        {
+            for (int i = players.Count - 1; i >= 0; i--)
+            {
+                var player = players[i];
+
+                if (!IsClientConnected(player))
+                {
+                    Console.WriteLine($"Player {player.ID} disconnected");
+
+                    try { player.stream?.Close(); } catch { }
+                    try { player.tcpClient?.Close(); } catch { }
+
+                    player.stream = null;
+
+                    players.RemoveAt(i);
+
+                    Console.WriteLine("Disconnected client removed");
+
+                    if (server.gameSession == TcpServer.GameSession.INPROGRESS)
+                        gameShouldStop = true;
+                }
+            }
+        }
+
+
+        if (gameShouldStop)
+        {
+            OnAbruptDisconnect();
+        }
+    }
+
+
 
     public bool IsClientConnected(Player player)
     {
         try
         {
-            byte[] beat = new byte[1];
+            if (player?.tcpClient == null)
+                return false;
 
-            player.stream.Write(beat, 0, beat.Length);
-            player.stream.Flush();
+            if (!player.tcpClient.Connected)
+                return false;
 
-            return true;
+            Socket socket = player.tcpClient.Client;
+
+            return !(socket.Poll(1, SelectMode.SelectRead) &&
+                     socket.Available == 0);
         }
         catch
         {
@@ -93,21 +177,50 @@ public class PlayerHandler
         }
     }
 
+
+
     public void KickPlayer(Player player, string reason)
     {
-        Console.WriteLine(
-            $"Player {player.ID} kicked: {reason}"
-        );
+        if (player == null)
+            return;
 
-        player.tcpClient.Close();
+        Console.WriteLine($"Player {player.ID} kicked: {reason}");
+
+        lock (playerLock)
+        {
+            players.Remove(player);
+        }
+
+        try { player.stream?.Close(); } catch { }
+        try { player.tcpClient?.Close(); } catch { }
+
+        player.stream = null;
+
         server.StopGameAbruptly(reason);
     }
+
+
+    public void RejectClient(TcpClient client)
+    {
+        try
+        {
+            byte[] data = Encoding.UTF8.GetBytes("MATCH_FULL\n");
+            var stream = client.GetStream();
+            stream.Write(data, 0, data.Length);
+            stream.Flush();
+        }
+        catch { }
+
+        client.Close();
+    }
+
+
 
     public void OnAbruptDisconnect()
     {
         Console.WriteLine("Player disconnected abruptly");
 
-        outgoingMessageHandler.SendCommandToAllPlayers(
+        outgoingMessageHandler?.SendCommandToAllPlayers(
             TcpServer.ServerCommands.FORCE_GAME_STOP
         );
     }

@@ -8,9 +8,8 @@ public enum PlayerStates
     IS_READY,
     IS_NOT_READY,
     PLAYING_TURN,
-    TURNS_DONE,
+    OUT,
     WAITING_FOR_TURN,
-    LOOKING_AT_RESULTS
 }
 
 public class Player
@@ -24,12 +23,27 @@ public class Player
     public List<int> cardsDrawn = new();
     public List<int> publicCards = new();
     public int score;
+    public List<int> knownEnemies = new();
 
     public Player(int id, TcpClient client)
     {
         ID = id;
         tcpClient = client;
         stream = client.GetStream();
+    }
+
+    public void AddKnownEnemy(int pEnemyID)
+    {
+        if (knownEnemies.Contains(pEnemyID))
+            return;
+        
+        knownEnemies.Add(pEnemyID);
+    }
+    
+
+    public bool knownsEnemy(int pEnemyID)
+    {
+        return knownEnemies.Contains(ID);
     }
     
 }

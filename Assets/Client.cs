@@ -1,47 +1,53 @@
 using UnityEngine;
-using TMPro;
-using System.Collections.Generic;
+using System;
 using System.IO;
 using System.Net.Sockets;
-using UnityEngine.Events;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 public class TextClient : MonoBehaviour
 {
-
-    
-  
-    
     [SerializeField] private IncomingServerCommunicator incomingServerCommunicator;
-    [SerializeField]
-    TextMeshProUGUI textField;
 
+    private TcpClient client;
+    private StreamReader reader;
+    public StreamWriter writer { get; private set; }
 
-    const int maxLinesDisplay = 22;
-    List<string> lines = new List<string>();
-    TcpClient client;
-    StreamReader reader;
-    StreamWriter writer;
+    public string serverConnectionStatus;
 
+    private bool connected = false;
 
-    /// <summary>
-    /// Adds new text to the text display, while ensuring the total number of lines 
-    /// doesn't exceed the maximum.
-    /// </summary>
-    void DisplayMessage(string text) {
-        textField.text = text;
-    }
-    
+    private CancellationTokenSource cancellationTokenSource;
+
+    // Thread-safe queue for messages coming from background thread
+    private ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
+
     void Start()
     {
-        TryServerConnection();
+        cancellationTokenSource = new CancellationTokenSource();
+        _ = ConnectionLoop(cancellationTokenSource.Token);
     }
-    private bool connected = false;
-    async void TryServerConnection()
-    {
-        Debug.Log("running");
 
+    async Task ConnectionLoop(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            if (!connected)
+            {
+                await TryConnect(token);
+            }
+
+            await Task.Delay(1000, token);
+        }
+    }
+
+    async Task TryConnect(CancellationToken token)
+    {
         try
         {
+            serverConnectionStatus = "Connecting...";
+
             client = new TcpClient();
             await client.ConnectAsync("127.0.0.1", 50001);
 
@@ -50,35 +56,72 @@ public class TextClient : MonoBehaviour
             reader = new StreamReader(stream);
             writer = new StreamWriter(stream) { AutoFlush = true };
 
-            DisplayMessage("Connected to server");
-            writer.WriteLine("wawawaw");
             connected = true;
-            return;
+            serverConnectionStatus = "Connected";
+            Debug.Log("Connected to server");
+
+            // Start background receive loop
+            _ = Task.Run(() => ReceiveLoop(token), token);
         }
-        catch
+        catch (Exception e)
         {
-            DisplayMessage("Connection failed... retrying for ");
+            Debug.LogWarning("Connection failed: " + e.Message);
+
+            Cleanup();
+
+            connected = false;
+            serverConnectionStatus = "Retrying...";
+        }
+    }
+
+    void ReceiveLoop(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested && client != null && client.Connected)
+            {
+                string message = reader.ReadLine(); // blocking, but OK here (background thread)
+
+                if (!string.IsNullOrEmpty(message))
+                {
+                    messageQueue.Enqueue(message.Trim());
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("Disconnected: " + e.Message);
         }
 
+        // Connection lost → trigger reconnect
         connected = false;
+        Cleanup();
+        serverConnectionStatus = "Disconnected, retrying...";
+    }
 
-        if (!connected)
-            //try again after 1 second
-            Invoke(nameof(TryServerConnection), 1f);
-    }
-    
-    public void SendMessageToClient(string message)
-    {
-        if(writer == null || client == null) return;
-        writer.WriteLine(message);
-    }
     void Update()
     {
-        if (client == null || writer == null) return;
-
-         if (client.Available > 0)
+        // Process messages safely on main thread
+        while (messageQueue.TryDequeue(out string message))
         {
-            incomingServerCommunicator.HandleIncomingMessage(reader.ReadLine().Trim());
+            incomingServerCommunicator.HandleIncomingMessage(message);
         }
+    }
+
+    void Cleanup()
+    {
+        try { reader?.Close(); } catch { }
+        try { writer?.Close(); } catch { }
+        try { client?.Close(); } catch { }
+
+        reader = null;
+        writer = null;
+        client = null;
+    }
+
+    private void OnDestroy()
+    {
+        cancellationTokenSource?.Cancel();
+        Cleanup();
     }
 }

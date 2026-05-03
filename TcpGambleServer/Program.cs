@@ -1,10 +1,9 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Linq;
 
 public class TcpServer
 {
-    #region Enums
-
     public enum GameSession
     {
         WAITING,
@@ -17,7 +16,7 @@ public class TcpServer
         IDLE,
         WAITING_FOR_PLAYERS,
         WAITING_ALL_PLAYERS_READY,
-        DEAL_CARDS,
+        DEALING_STARTING_CARDS,
         PLAYING_STATE,
         SHOW_RESULT,
         RESET_ROUND
@@ -38,31 +37,40 @@ public class TcpServer
 
     public enum ValueTypes
     {
-        HAND,
+        THISID,
+        ENEMYID,
+        SCORE,
         CARD,
-        ENEMYCARD,
-        SCORE
+        READY,
+        UNREADY,
+        HIT,
+        STAND,
+        STARTTURN,
+        ENDTURN,
+        OUT,
+        WINNER
     }
 
-    #endregion
-
-
     public GameState currentGameState = GameState.IDLE;
-
     public GameSession gameSession = GameSession.WAITING;
 
     public Player activePlayer;
 
-    private Random rnd = new();
+    private readonly Random rnd = new();
 
+    private PlayerHandler playerHandler;
     private OutgoingMessageHandler outgoingMessageHandler;
     private IncomingMessageHandler incomingMessageHandler;
-    private PlayerHandler playerHandler;
+
+    private bool turnChanging = false;
+
+    public List<Player> players => playerHandler.GetPlayersSnapshot();
 
     public TcpServer()
     {
+        playerHandler = new PlayerHandler(this, null);
         outgoingMessageHandler = new OutgoingMessageHandler(this, playerHandler);
-        playerHandler = new PlayerHandler(this, outgoingMessageHandler);
+        playerHandler.SetOutgoing(outgoingMessageHandler);
         incomingMessageHandler = new IncomingMessageHandler(this, outgoingMessageHandler, playerHandler);
     }
 
@@ -74,74 +82,209 @@ public class TcpServer
 
     public void StartServer(int port)
     {
-        TcpListener listener =
-            new TcpListener(IPAddress.Any, port);
-
+        TcpListener listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
 
-        Console.WriteLine(
-            $"TCP server started on port {port}"
-        );
-
-        currentGameState =
-            GameState.WAITING_FOR_PLAYERS;
+        currentGameState = GameState.WAITING_FOR_PLAYERS;
 
         while (true)
         {
             if (currentGameState == GameState.WAITING_FOR_PLAYERS)
-            {
                 playerHandler.AcceptNewClients(listener);
-            }
 
             incomingMessageHandler.ProcessIncomingMessages();
             playerHandler.CleanupClients();
 
-            Thread.Sleep(10);
+            System.Threading.Thread.Sleep(10);
         }
+    }
+
+    public void StartGame()
+    {
+        var snapshot = players;
+
+        if (snapshot.Count == 0)
+            return;
+
+        outgoingMessageHandler.SendCommandToAllPlayers(ServerCommands.GAME_START);
+
+        gameSession = GameSession.INPROGRESS;
+
+        DealStartingCards();
+        PassTurn();
+    }
+
+    public void DealStartingCards()
+    {
+        currentGameState = GameState.DEALING_STARTING_CARDS;
+
+        var snapshot = players;
+
+        foreach (var player in snapshot)
+        {
+            DealCard(player, true);
+            player.score = CalculateScore(player.cardsDrawn);
+            outgoingMessageHandler.ValueHandler(ValueTypes.SCORE, player, player.score);
+        }
+
+        activePlayer = snapshot.FirstOrDefault(p => p.PlayerState != PlayerStates.OUT);
+
+        if (activePlayer == null)
+        {
+            DisplayScores();
+            return;
+        }
+
+        currentGameState = GameState.PLAYING_STATE;
+    }
+
+    public void DealCard(Player player, bool isPrivate)
+    {
+        if (player == null) return;
+
+        int card = rnd.Next(0, 14);
+        player.cardsDrawn.Add(card);
+
+        if (isPrivate)
+        {
+            outgoingMessageHandler.SendCardToPlayer(player, card);
+            outgoingMessageHandler.SendCardToAllPlayers(player, 14, player);
+        }
+        else
+        {
+            outgoingMessageHandler.SendCardToAllPlayers(player, card);
+        }
+    }
+
+    public void OnHit(Player pPlayer)
+    {
+        DealCard(pPlayer, false);
+
+        pPlayer.score = CalculateScore(pPlayer.cardsDrawn);
+        outgoingMessageHandler.ValueHandler(ValueTypes.SCORE, pPlayer, pPlayer.score);
+
+        if (pPlayer.score >= 21)
+            playerHandler.SetAndUpdatePlayersOfPlayerState(pPlayer, PlayerStates.OUT);
+        else
+            playerHandler.SetAndUpdatePlayersOfPlayerState(pPlayer, PlayerStates.WAITING_FOR_TURN);
+
+        PassTurn();
+    }
+
+    public void OnStand(Player pPlayer)
+    {
+        playerHandler.SetAndUpdatePlayersOfPlayerState(pPlayer, PlayerStates.OUT);
+        PassTurn();
+    }
+
+    public void PassTurn()
+    {
+        var snapshot = players;
+
+        if (snapshot.Count == 0)
+            return;
+
+        if (activePlayer == null || !snapshot.Contains(activePlayer))
+        {
+            activePlayer = snapshot.FirstOrDefault(p => p.PlayerState != PlayerStates.OUT);
+
+            if (activePlayer == null)
+            {
+                DisplayScores();
+                return;
+            }
+
+            GiveTurn(activePlayer);
+            return;
+        }
+
+        outgoingMessageHandler.SendValueToAllPlayers(ValueTypes.ENDTURN, activePlayer.ID);
+
+        int currentIndex = snapshot.IndexOf(activePlayer);
+
+        if (currentIndex == -1)
+        {
+            activePlayer = snapshot.FirstOrDefault(p => p.PlayerState != PlayerStates.OUT);
+
+            if (activePlayer == null)
+            {
+                DisplayScores();
+                return;
+            }
+
+            GiveTurn(activePlayer);
+            return;
+        }
+
+        for (int i = 1; i <= snapshot.Count; i++)
+        {
+            int index = (currentIndex + i) % snapshot.Count;
+            var next = snapshot[index];
+
+            if (next.PlayerState != PlayerStates.OUT)
+            {
+                GiveTurn(next);
+                return;
+            }
+        }
+
+        DisplayScores();
+    }
+
+    public void GiveTurn(Player player)
+    {
+        if (player == null) return;
+
+        if (turnChanging) return;
+        turnChanging = true;
+
+        activePlayer = player;
+        player.PlayerState = PlayerStates.PLAYING_TURN;
+
+        outgoingMessageHandler.SendValueToAllPlayers(ValueTypes.STARTTURN, player.ID);
+
+        turnChanging = false;
+    }
+
+    public void DisplayScores()
+    {
+        gameSession = GameSession.ENDED;
+        currentGameState = GameState.SHOW_RESULT;
+        outgoingMessageHandler.SendCommandToAllPlayers(ServerCommands.SHOW_RESULTS);
+        Player highestScorePlayer = null;
+        int highestScore = 0;
+        foreach (var player in playerHandler.GetPlayersSnapshot())
+        {
+            outgoingMessageHandler.ValueHandler(ValueTypes.SCORE, player, player.score);
+            if (player.score > highestScore)
+            {
+                highestScore = player.score;
+                highestScorePlayer = player;
+            }
+        }
+        
+ 
+
+        DisplayWinner(highestScorePlayer);
+        ResetGame();
+
+    }
+
+    public void ResetGame()
+    {
+        
+    }
+
+    public void DisplayWinner(Player pPlayer)
+    {
+        outgoingMessageHandler.SendValueToAllPlayers( ValueTypes.WINNER, pPlayer.ID);
     }
 
     public void StopGameAbruptly(string reason)
     {
-        Console.WriteLine("Stopped game: " + reason);
-    }
-
-    public List<Player> players => playerHandler.players;
-
-    public void OnHit(Player player)
-    {
-        DealCard(player);
-
-        player.score =
-            CalculateScore(player.cardsDrawn);
-
-        if (player.score >= 21)
-        {
-            player.PlayerState =
-                PlayerStates.TURNS_DONE;
-        }
-
-        PassTurn();
-    }
-
-    public void OnStand(Player player)
-    {
-        player.PlayerState =
-            PlayerStates.TURNS_DONE;
-
-        PassTurn();
-    }
-
-    public void DealCard(Player player)
-    {
-        int card = rnd.Next(0, 13);
-
-        player.cardsDrawn.Add(card);
-
-        outgoingMessageHandler.SendValueToPlayer(
-            player,
-            ValueTypes.CARD,
-            card
-        );
+        gameSession = GameSession.WAITING;
+        currentGameState = GameState.WAITING_FOR_PLAYERS;
+        activePlayer = null;
     }
 
     public int CalculateScore(List<int> cards)
@@ -151,19 +294,9 @@ public class TcpServer
 
         foreach (int card in cards)
         {
-            if (card == 0)
-            {
-                total += 11;
-                aces++;
-            }
-            else if (card >= 10)
-            {
-                total += 10;
-            }
-            else
-            {
-                total += card + 1;
-            }
+            if (card == 0) { total += 11; aces++; }
+            else if (card >= 10) total += 10;
+            else total += card + 1;
         }
 
         while (total > 21 && aces > 0)
@@ -175,50 +308,14 @@ public class TcpServer
         return total;
     }
 
-    public void PassTurn()
+    public void SetAllPlayersState(PlayerStates state)
     {
-        activePlayer.PlayerState = PlayerStates.WAITING_FOR_TURN;
-
-        int currentIndex = players.IndexOf(activePlayer);
-
-        for (int i = 1; i < players.Count; i++)
-        {
-            int index =
-                (currentIndex + i) % players.Count;
-
-            if (players[index].PlayerState ==
-                PlayerStates.TURNS_DONE)
-                continue;
-
-            GiveTurn(players[index]);
-            break;
-        }
-    }
-
-    public void GiveTurn(Player player)
-    {
-        activePlayer = player;
-
-        player.PlayerState =
-            PlayerStates.PLAYING_TURN;
-
-        outgoingMessageHandler
-            .SendCommandToPlayer(
-                player,
-                ServerCommands.IS_TURN
-            );
+        foreach (var player in players)
+            player.PlayerState = state;
     }
 
     public bool CheckAllPlayerForState(PlayerStates state)
     {
         return players.All(p => p.PlayerState == state);
-    }
-
-    public void SetAllPlayersState(PlayerStates state)
-    {
-        foreach (var player in players)
-        {
-            player.PlayerState = state;
-        }
     }
 }
