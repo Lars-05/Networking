@@ -154,6 +154,7 @@ public class PlayerHandler
         }
     }
 
+   
 
 
     public bool IsClientConnected(Player player)
@@ -179,24 +180,31 @@ public class PlayerHandler
 
 
 
-    public void KickPlayer(Player player, string reason)
+    public void KickPlayer(Player pPlayer, string reason)
     {
-        if (player == null)
+        if (pPlayer == null)
             return;
-
-        Console.WriteLine($"Player {player.ID} kicked: {reason}");
+        
+        int id = pPlayer.ID;
+        Console.WriteLine($"Player {pPlayer.ID} kicked: {reason}");
 
         lock (playerLock)
         {
-            players.Remove(player);
+            players.Remove(pPlayer);
         }
 
-        try { player.stream?.Close(); } catch { }
-        try { player.tcpClient?.Close(); } catch { }
 
-        player.stream = null;
+        try { pPlayer.stream?.Close(); } catch { }
+        try { pPlayer.tcpClient?.Close(); } catch { }
 
-        server.StopGameAbruptly(reason);
+        pPlayer.stream = null;
+        
+        
+        foreach (var player in GetPlayersSnapshot())
+        {
+            player.knownEnemies.Remove(pPlayer.ID);
+        }
+        outgoingMessageHandler.SendValueToAllPlayers(TcpServer.ValueTypes.DISCONNECTED, id);
     }
 
 

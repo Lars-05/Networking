@@ -15,6 +15,7 @@ public class ThisPlayerActionManager : MonoBehaviour
 
     [SerializeField] private Transform cardParent;
     [SerializeField] private GameObject cardPrefab;
+    [SerializeField] private Image crownImage;
 
     private int score;
     private bool isReady;
@@ -34,13 +35,22 @@ public class ThisPlayerActionManager : MonoBehaviour
         readyButton.onClick.RemoveListener(ReadyButtonClicked);
     }
 
+    public void Awake()
+    {
+        readyButton.interactable = false;
+        standButton.gameObject.SetActive(false);
+        hitButton.gameObject.SetActive(false);
+    }
     public void Setup()
     {
+        crownImage.enabled = false;
         readyButton.gameObject.SetActive(true);
         standButton.gameObject.SetActive(false);
         hitButton.gameObject.SetActive(false);
         scoreText.gameObject.SetActive(false);
 
+        readyButton.interactable = true;
+        
         readyButtonText.text = "Status: Unready";
         readyButton.interactable = true;
 
@@ -112,12 +122,12 @@ public class ThisPlayerActionManager : MonoBehaviour
         cardValueText.text = "Deck Value: " + score;
     }
 
-    public void ShowScore(bool isHighestScore)
+    public void ShowScore()
     {
         hitButton.gameObject.SetActive(false);
         standButton.gameObject.SetActive(false);
-        readyButton.gameObject.SetActive(false);
-
+        readyButton.gameObject.SetActive(true);
+        OnUnReady();
         scoreText.gameObject.SetActive(true);
         scoreText.text = "Score: " + score;
     }
@@ -126,7 +136,6 @@ public class ThisPlayerActionManager : MonoBehaviour
     {
         ClearDeck();
         Setup();
-        isReady = false;
     }
 
     private void ReadyButtonClicked()
@@ -135,16 +144,34 @@ public class ThisPlayerActionManager : MonoBehaviour
 
         if (isReady)
         {
-            EventBus.RaiseSendCommandToServer(
-                OutgoingServerCommunicator.ClientCommands.IS_READY);
-            readyButtonText.text = "Status: Ready";
-            return;
+            OnReady();
         }
+        else
+        {
+            OnUnReady();
+        }
+    }
 
+    private void OnReady()
+    {
+        isReady = true;
+        EventBus.RaiseSendCommandToServer(
+            OutgoingServerCommunicator.ClientCommands.IS_READY);
+        readyButtonText.text = "Status: Ready";
+    }
+    
+    private void OnUnReady()
+    {
+        isReady = false;
         EventBus.RaiseSendCommandToServer(
             OutgoingServerCommunicator.ClientCommands.IS_NOT_READY);
 
         readyButtonText.text = "Status: Unready";
+    }
+
+    public void OnWin()
+    {
+        crownImage.enabled = true;
     }
 
     private void OnHit()

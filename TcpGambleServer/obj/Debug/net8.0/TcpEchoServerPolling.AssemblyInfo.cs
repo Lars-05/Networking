@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TcpEchoServerPolling")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5f41867513c874ce400f1a8714c9309eb3e39321")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e3b2e730207c84e8f877f093f82a07664fec496d")]
 [assembly: System.Reflection.AssemblyProductAttribute("TcpEchoServerPolling")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TcpEchoServerPolling")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

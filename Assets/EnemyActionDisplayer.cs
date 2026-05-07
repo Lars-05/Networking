@@ -20,15 +20,20 @@ public class EnemyActionDisplayer : MonoBehaviour
     [SerializeField] private RectTransform standButtonRt;
     [SerializeField] private RectTransform readyButtonRt;
     [SerializeField] private TextMeshProUGUI readyButtonText;
+    
+    [Header("Additional Fields")]
+    [SerializeField] private Image crownImage;
+  
 
+    
     [Header("Status Display")]
     [SerializeField] private Image statusDisplayer;
-
-    [Header("Status Colors")]
-    [SerializeField] private Color turnColor;
-    [SerializeField] private Color defaultColor;
-    [SerializeField] private Color outColor;
-    [SerializeField] private Color winnerColor;
+    
+    [Header("Status Materials")]
+    [SerializeField] private Material turnMaterial;
+    [SerializeField] private Material  defaultMaterial;
+    [SerializeField] private Material  outMaterial;
+    [SerializeField] private Material  winnerMaterial;
 
     private List<GameObject> cards = new();
     private int score;
@@ -38,8 +43,8 @@ public class EnemyActionDisplayer : MonoBehaviour
     public void SetupPlayer(int pId)
     {
         readyButtonRt.gameObject.SetActive(true);
-        statusDisplayer.color = defaultColor;
-
+        statusDisplayer.material = defaultMaterial;
+        crownImage.enabled = false;
         PlayerId = pId;
         score = 0;
 
@@ -54,17 +59,17 @@ public class EnemyActionDisplayer : MonoBehaviour
 
     public void OnTurnStart()
     {
-        statusDisplayer.color = turnColor;
+        statusDisplayer.material = turnMaterial;
     }
 
     public void OnOut()
     {
-        statusDisplayer.color = outColor;
+        statusDisplayer.material = outMaterial;
     }
 
     public void OnTurnOver()
     {
-        statusDisplayer.color = defaultColor;
+        statusDisplayer.material = defaultMaterial;
     }
 
     public void SetScore(int pScore)
@@ -72,19 +77,22 @@ public class EnemyActionDisplayer : MonoBehaviour
         score = pScore;
     }
 
-    public void ShowScore(bool isHighestScore)
+    public void OnWin()
+    {
+        statusDisplayer.material = winnerMaterial;
+        crownImage.enabled = true;
+    }
+
+    public void ShowScore()
     {
         hitButtonRt.gameObject.SetActive(false);
+
         standButtonRt.gameObject.SetActive(false);
-        readyButtonRt.gameObject.SetActive(false);
+        readyButtonRt.gameObject.SetActive(true);
 
         scoreText.gameObject.SetActive(true);
         scoreText.text = "Score: " + score;
-
-        if (isHighestScore)
-        {
-            statusDisplayer.color = winnerColor;
-        }
+        OnUnready();
     }
 
     public void Reset()

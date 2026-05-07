@@ -39,6 +39,13 @@ public class Player
         
         knownEnemies.Add(pEnemyID);
     }
+
+    public void ClearData()
+    {
+        score = 0;
+        cardsDrawn.Clear();
+        publicCards.Clear();
+    }
     
 
     public bool knownsEnemy(int pEnemyID)

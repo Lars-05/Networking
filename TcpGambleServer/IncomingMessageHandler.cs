@@ -5,6 +5,7 @@ public class IncomingMessageHandler
     private readonly TcpServer server;
     private readonly OutgoingMessageHandler outgoing;
     private readonly PlayerHandler playerHandler;
+    
 
     public IncomingMessageHandler(TcpServer server, OutgoingMessageHandler outgoing, PlayerHandler pPlayerHandler)
     {
@@ -36,6 +37,8 @@ public class IncomingMessageHandler
             Handle(message, player);
         }
     }
+
+
     
     public void Handle(string msg, Player pPlayer)
     {
@@ -52,6 +55,8 @@ public class IncomingMessageHandler
                 playerHandler.SetAndUpdatePlayersOfPlayerState(pPlayer, PlayerStates.IS_READY);
                 if (server.CheckAllPlayerForState(PlayerStates.IS_READY) && playerHandler.players.Count > 1)
                 {
+                    
+                    server.ClearAllMatchData();
                     server.StartGame();
                 }
                 break;
@@ -93,7 +98,7 @@ public class IncomingMessageHandler
                 break;
 
             default:
-                playerHandler.KickPlayer(pPlayer, "Unknown command");
+                playerHandler.KickPlayer(pPlayer, "Unknown command: " + msg);
                 break;
         }
     }

@@ -27,7 +27,7 @@ public class OutgoingMessageHandler
         }
         catch
         {
-            // optionally log error
+     
         }
     }
 
@@ -127,6 +127,10 @@ public class OutgoingMessageHandler
             
             case TcpServer.ValueTypes.WINNER:
                 message = $"WINNER_{subjectValue}";
+                break;
+            
+            case TcpServer.ValueTypes.DISCONNECTED:
+                message = $"DISCONNECTED_{subjectValue}";
                 break;
 
             case TcpServer.ValueTypes.THISID:

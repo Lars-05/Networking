@@ -27,7 +27,7 @@ public class IncomingServerCommunicator : MonoBehaviour
         switch (message)
         {
             case "FORCE_GAME_STOP":
-                playerManager.ResetAllPlayers();
+                playerManager.ResetGame();
             break;
             
             case "SHOW_RESULTS":
@@ -35,11 +35,15 @@ public class IncomingServerCommunicator : MonoBehaviour
                 break;
             
             case "GAME_STOP":
-                playerManager.ResetAllPlayers();
+                playerManager.ResetGame();
                 break;
             
             case "GAME_START":
                 playerManager.OnGameStart();
+                break;
+            
+            case "RESET_DATA":
+				playerManager.ResetGame();
                 break;
             
             default:
@@ -133,6 +137,13 @@ public class IncomingServerCommunicator : MonoBehaviour
                 id = int.Parse( message[1]);
                 playerManager.OnWin(id);
                 break;
+            
+            case "DISCONNECTED":
+                id = int.Parse( message[1]);
+                playerManager.OnPlayerDisconnect(id);
+                break;
+            
+            
             default:
                 Debug.Log("Unaccounted for value type " +  message[0]);
                 break;

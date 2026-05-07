@@ -8,7 +8,6 @@ public class TcpServer
     {
         WAITING,
         INPROGRESS,
-        ENDED
     }
 
     public enum GameState
@@ -32,7 +31,9 @@ public class TcpServer
         SHOW_RESULTS,
         GAME_STOP,
         FORCE_GAME_STOP,
-        MATCH_FULL
+        MATCH_FULL,
+        RESET_DATA
+        
     }
 
     public enum ValueTypes
@@ -48,7 +49,8 @@ public class TcpServer
         STARTTURN,
         ENDTURN,
         OUT,
-        WINNER
+        WINNER,
+        DISCONNECTED,
     }
 
     public GameState currentGameState = GameState.IDLE;
@@ -99,8 +101,13 @@ public class TcpServer
         }
     }
 
+
     public void StartGame()
     {
+
+        
+        ClearAllMatchData();
+        
         var snapshot = players;
 
         if (snapshot.Count == 0)
@@ -142,13 +149,13 @@ public class TcpServer
     {
         if (player == null) return;
 
-        int card = rnd.Next(0, 14);
+        int card = rnd.Next(0, 13);
         player.cardsDrawn.Add(card);
 
         if (isPrivate)
         {
             outgoingMessageHandler.SendCardToPlayer(player, card);
-            outgoingMessageHandler.SendCardToAllPlayers(player, 14, player);
+            outgoingMessageHandler.SendCardToAllPlayers(player, 13, player);
         }
         else
         {
@@ -229,6 +236,7 @@ public class TcpServer
         }
 
         DisplayScores();
+      
     }
 
     public void GiveTurn(Player player)
@@ -248,31 +256,38 @@ public class TcpServer
 
     public void DisplayScores()
     {
-        gameSession = GameSession.ENDED;
-        currentGameState = GameState.SHOW_RESULT;
+        gameSession = GameSession.WAITING;
+        currentGameState = GameState.WAITING_ALL_PLAYERS_READY;
         outgoingMessageHandler.SendCommandToAllPlayers(ServerCommands.SHOW_RESULTS);
+
         Player highestScorePlayer = null;
         int highestScore = 0;
+
         foreach (var player in playerHandler.GetPlayersSnapshot())
         {
-            outgoingMessageHandler.ValueHandler(ValueTypes.SCORE, player, player.score);
-            if (player.score > highestScore)
+            outgoingMessageHandler.SendValueToAllPlayers( TcpServer.ValueTypes.SCORE , player.score);
+
+            if (player.score <= 21 && player.score > highestScore)
             {
                 highestScore = player.score;
                 highestScorePlayer = player;
             }
         }
-        
- 
 
-        DisplayWinner(highestScorePlayer);
-        ResetGame();
 
+        if (highestScorePlayer != null)
+        {
+            DisplayWinner(highestScorePlayer);
+        }
     }
 
-    public void ResetGame()
+    public void ClearAllMatchData()
     {
-        
+        outgoingMessageHandler.SendCommandToAllPlayers(ServerCommands.RESET_DATA);
+        foreach (var player in playerHandler.GetPlayersSnapshot())
+        {
+            player.ClearData();
+        }
     }
 
     public void DisplayWinner(Player pPlayer)

@@ -14,8 +14,9 @@ public class PlayerManager : MonoBehaviour
 
     private int highestScoreID;
     private int highestScore = 0;
-    
 
+
+    
     public void OnGameStart()
     {
         thisPlayerActionManager.OnGameStart();
@@ -55,15 +56,7 @@ public class PlayerManager : MonoBehaviour
         }
     }
 
-    public void ResetAllPlayers()
-    {
-        thisPlayerActionManager.Reset();
 
-        foreach (var id in enemyActionDisplayers.Keys)
-        {
-            GetPlayerDisplayer(id)?.Reset();
-        }
-    }
 
     public void ClearPlayerDisplayersDecks()
     {
@@ -107,14 +100,11 @@ public class PlayerManager : MonoBehaviour
 
     public void ShowAllPlayerScores()
     {
-        thisPlayerActionManager.ShowScore(PlayerData.id == highestScoreID);
-
-        foreach (var displayer in enemyActionDisplayers.Values)
+        thisPlayerActionManager.ShowScore();
+        foreach (var enemy in enemyActionDisplayers.Values)
         {
-            displayer.ShowScore(displayer.PlayerId == highestScoreID);
+            enemy.ShowScore();
         }
-
-        highestScoreID = 0;
     }
 
     public void OnHit(int pId)
@@ -187,23 +177,23 @@ public class PlayerManager : MonoBehaviour
     }
     
     
-    public void OnWin()
+    public void OnWin(int pId)
     {
-        /*
+        
         if (pId == PlayerData.id)
         {
-            thisPlayerActionManager.OnTurnOver();
+            thisPlayerActionManager.OnWin();
             return;
         }
         foreach (var enemy in enemyActionDisplayers)
         {
             if (enemy.Value.PlayerId == pId)
             {
-                enemy.Value.OnTurnOver();
+                enemy.Value.OnWin();
                 return;
             }
         }
-        */
+        
     }
     
     public void OnTurnStart(int pId)
@@ -233,6 +223,23 @@ public class PlayerManager : MonoBehaviour
                 enemy.Value.OnOut();
                 return;
             }
+        }
+    }
+    
+
+
+    public void OnPlayerDisconnect(int pId)
+    {
+        RemovePlayer(pId);
+        ResetGame();
+    }
+
+    public void ResetGame()
+    {
+        foreach (var enemy in enemyActionDisplayers)
+        {
+            enemy.Value.Reset();
+            thisPlayerActionManager.Reset();
         }
     }
 
