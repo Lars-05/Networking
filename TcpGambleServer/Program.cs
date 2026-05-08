@@ -265,7 +265,7 @@ public class TcpServer
 
         foreach (var player in playerHandler.GetPlayersSnapshot())
         {
-            outgoingMessageHandler.SendValueToAllPlayers( TcpServer.ValueTypes.SCORE , player.score);
+            outgoingMessageHandler.SendScoreToAllPlayers();
 
             if (player.score <= 21 && player.score > highestScore)
             {

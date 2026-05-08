@@ -79,6 +79,7 @@ public class IncomingServerCommunicator : MonoBehaviour
                 break;
             
             case "SCORE":
+                Debug.Log("Recived Score");
                 // example format = SCORE_1_14
                 playerManager.AddPlayerScore(int.Parse( message[1]), int.Parse( message[2]));
                 break;

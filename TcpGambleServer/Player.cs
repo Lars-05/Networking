@@ -48,9 +48,10 @@ public class Player
     }
     
 
-    public bool knownsEnemy(int pEnemyID)
+    public bool KnownsEnemy(int pEnemyID)
     {
         return knownEnemies.Contains(ID);
+        
     }
     
 }

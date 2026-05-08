@@ -116,13 +116,13 @@ public class ThisPlayerActionManager : MonoBehaviour
         cards.Clear();
     }
 
-    public void AddScore(int pScore)
+    public void SetScore(int pScore)
     {
         score = pScore;
-        cardValueText.text = "Deck Value: " + score;
+        cardValueText.text = "Deck Value: " + score; 
     }
 
-    public void ShowScore()
+    public void ShowFinalScore()
     {
         hitButton.gameObject.SetActive(false);
         standButton.gameObject.SetActive(false);

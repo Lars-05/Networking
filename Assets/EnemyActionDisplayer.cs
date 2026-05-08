@@ -55,6 +55,8 @@ public class EnemyActionDisplayer : MonoBehaviour
     public void OnGameStart()
     {
         readyButtonRt.gameObject.SetActive(false);
+        hitButtonRt.gameObject.SetActive(true);
+        standButtonRt.gameObject.SetActive(true);
     }
 
     public void OnTurnStart()
@@ -75,6 +77,7 @@ public class EnemyActionDisplayer : MonoBehaviour
     public void SetScore(int pScore)
     {
         score = pScore;
+        scoreText.text =  score.ToString();
     }
 
     public void OnWin()
@@ -86,7 +89,6 @@ public class EnemyActionDisplayer : MonoBehaviour
     public void ShowScore()
     {
         hitButtonRt.gameObject.SetActive(false);
-
         standButtonRt.gameObject.SetActive(false);
         readyButtonRt.gameObject.SetActive(true);
 

@@ -58,6 +58,20 @@ public class OutgoingMessageHandler
         }
     }
 
+    public void SendScoreToAllPlayers()
+    {
+        var players = playerHandler.GetPlayersSnapshot();
+
+        foreach (var receiver in players)
+        {
+            foreach (var player in players)
+            {
+                SendMessageToPlayer(receiver,  $"SCORE_{player.ID}_{player.score}");
+              
+            }
+        }
+    }
+
     public void SendCardToAllPlayers(Player owner, int value, Player exception = null)
     {
         foreach (var player in playerHandler.GetPlayersSnapshot())
@@ -141,13 +155,13 @@ public class OutgoingMessageHandler
                     if (player == targetPlayer)
                         continue;
 
-                    if (!player.knownsEnemy(subjectValue))
+                    if (!player.KnownsEnemy(subjectValue))
                     {
                         SendMessageToPlayer(player, $"ENEMYID_{subjectValue}");
                         player.AddKnownEnemy(subjectValue);
                     }
 
-                    if (!targetPlayer.knownsEnemy(player.ID))
+                    if (!targetPlayer.KnownsEnemy(player.ID))
                     {
                         SendMessageToPlayer(targetPlayer, $"ENEMYID_{player.ID}");
                         targetPlayer.AddKnownEnemy(player.ID);

@@ -83,15 +83,9 @@ public class PlayerManager : MonoBehaviour
 
     public void AddPlayerScore(int pId, int score)
     {
-        if (score > highestScore)
-        {
-            highestScoreID = pId;
-            highestScore = score;
-        }
-
         if (pId == PlayerData.id)
         {
-            thisPlayerActionManager.AddScore(score);
+            thisPlayerActionManager.SetScore(score);
             return;
         }
 
@@ -100,7 +94,7 @@ public class PlayerManager : MonoBehaviour
 
     public void ShowAllPlayerScores()
     {
-        thisPlayerActionManager.ShowScore();
+        thisPlayerActionManager.ShowFinalScore();
         foreach (var enemy in enemyActionDisplayers.Values)
         {
             enemy.ShowScore();
