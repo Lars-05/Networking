@@ -9,7 +9,7 @@ public class PlayerHandler
 
     private OutgoingMessageHandler outgoingMessageHandler;
 
-    private int lobbySize = 2;
+
     private readonly object playerLock = new object();
     private int nextPlayerId = 1;
 
@@ -35,76 +35,73 @@ public class PlayerHandler
 
         TcpClient newClient = listener.AcceptTcpClient();
 
-        Player player;
+        Player newPlayer;
 
         lock (playerLock)
         {
-            if (players.Count >= lobbySize || server.gameSession == TcpServer.GameSession.INPROGRESS)
+            /// Dont allow connects when the game is inprogress
+            if (server.currentGameSession == TcpServer.GameSession.INPROGRESS)
             {
                 RejectClient(newClient);
                 return;
             }
+            
+            newPlayer = new Player(nextPlayerId++, newClient);
+            players.Add( newPlayer);
 
-            player = new Player(nextPlayerId++, newClient);
-            players.Add(player);
 
-            Console.WriteLine($"Client connected (Player {player.ID})");
-
-            if (players.Count == lobbySize)
-            {
-                server.currentGameState =
-                    TcpServer.GameState.WAITING_ALL_PLAYERS_READY;
-            }
+            Console.WriteLine($"Client connected (Player { newPlayer.ID})");
+            
         }
+        
+        
 
 
-        outgoingMessageHandler?.ValueHandler(
-            TcpServer.ValueTypes.THISID,
-            player,
-            player.ID
-        );
-    }
-
-    public void SetAndUpdatePlayersOfPlayerState(Player pPlayer, PlayerStates pState)
-    {
-        pPlayer.PlayerState = pState;
+        outgoingMessageHandler?.SendValueToPlayer(newPlayer, TcpServer.ValueTypes.THISID, newPlayer.ID);
+        
+        
+        // checks and sets up enemy displayers
         foreach (var player in GetPlayersSnapshot())
         {
-            switch (pState)
+            foreach (var enemy in GetPlayersSnapshot())
             {
-                case PlayerStates.IDLE:
-                    break;
-
-                case PlayerStates.IS_READY:
-                    outgoingMessageHandler.ValueHandler(
-                        TcpServer.ValueTypes.READY, player, pPlayer.ID
-                    );
-                    break;
-
-                case PlayerStates.IS_NOT_READY:
-                    outgoingMessageHandler.ValueHandler(
-                        TcpServer.ValueTypes.UNREADY, player, pPlayer.ID
-                    );
-                    break;
-
-                case PlayerStates.PLAYING_TURN:
-                    outgoingMessageHandler.ValueHandler(
-                        TcpServer.ValueTypes.STARTTURN, player, pPlayer.ID
-                    );
-                    break;
-
-                case PlayerStates.WAITING_FOR_TURN:
-                    outgoingMessageHandler.ValueHandler(
-                        TcpServer.ValueTypes.ENDTURN, player, pPlayer.ID
-                    );
-                    break;
-
-                case PlayerStates.OUT:
-                    outgoingMessageHandler.ValueHandler(
-                        TcpServer.ValueTypes.OUT, player, pPlayer.ID
-                    );
-                    break;
+                if(player == enemy)
+                    continue;
+                
+                if(player.KnownsEnemy(enemy.ID))
+                    continue;
+                    
+                outgoingMessageHandler.SendValueToPlayer(player, TcpServer.ValueTypes.ENEMYID, new []{enemy.ID});
+                player.knownEnemies.Add(enemy.ID);
+                
             }
+        }
+    }
+    
+    public bool CanStartGame()
+    {
+        lock (playerLock)
+        {
+            if (players.Count < 2)
+                return false;
+
+            return players.All(p => p.PlayerState == PlayerStates.IS_READY);
+        }
+    }
+    
+    public void SetPlayerState(Player pPlayer, PlayerStates pState)
+    {
+        lock (playerLock)
+        {
+            pPlayer.SetPlayerState(pState);
+        }
+    }
+
+    public void SetAllPlayerStates(PlayerStates pState)
+    {
+        foreach (var p in GetPlayersSnapshot())
+        {
+            SetPlayerState(p, pState);
         }
     }
 
@@ -120,7 +117,6 @@ public class PlayerHandler
 
     public void CleanupClients()
     {
-        bool gameShouldStop = false;
 
         lock (playerLock)
         {
@@ -130,29 +126,42 @@ public class PlayerHandler
 
                 if (!IsClientConnected(player))
                 {
-                    Console.WriteLine($"Player {player.ID} disconnected");
+                    OnPlayerDisconnected(player);
 
-                    try { player.stream?.Close(); } catch { }
-                    try { player.tcpClient?.Close(); } catch { }
 
-                    player.stream = null;
-
-                    players.RemoveAt(i);
-
-                    Console.WriteLine("Disconnected client removed");
-
-                    if (server.gameSession == TcpServer.GameSession.INPROGRESS)
-                        gameShouldStop = true;
                 }
             }
         }
+    }
 
+    bool gameShouldStop = false;
+    public void OnPlayerDisconnected(Player pPlayer)
+    {
+        
+        Console.WriteLine($"Player {pPlayer.ID} disconnected");
 
+        try { pPlayer.stream?.Close(); } catch { }
+        try { pPlayer.tcpClient?.Close(); } catch { }
+
+        pPlayer.stream = null;
+        
+        Console.WriteLine("Disconnected client removed");
+
+        gameShouldStop = server.currentGameSession == TcpServer.GameSession.INPROGRESS;
+                    
+        // If game in progess, stop the game and kick the player. If game not in progress, kick the player
         if (gameShouldStop)
         {
+            KickPlayer(pPlayer, "Disconnected");
             OnAbruptDisconnect();
         }
+        else
+        {
+            KickPlayer(pPlayer, "Disconnected");
+        }
+        
     }
+    
 
    
 
@@ -179,7 +188,16 @@ public class PlayerHandler
     }
 
 
-
+    public void DeletePlayerDisplayers(int disconnectedPlayerId)
+    {
+        foreach (var player in GetPlayersSnapshot())
+        {
+            if (!player.knownEnemies.Contains(disconnectedPlayerId))
+                continue;
+            
+            outgoingMessageHandler.BroadcastValue(TcpServer.ValueTypes.DISCONNECTED, new []{disconnectedPlayerId});
+        }
+    }
     public void KickPlayer(Player pPlayer, string reason)
     {
         if (pPlayer == null)
@@ -192,19 +210,12 @@ public class PlayerHandler
         {
             players.Remove(pPlayer);
         }
-
-
+        
         try { pPlayer.stream?.Close(); } catch { }
         try { pPlayer.tcpClient?.Close(); } catch { }
-
         pPlayer.stream = null;
         
-        
-        foreach (var player in GetPlayersSnapshot())
-        {
-            player.knownEnemies.Remove(pPlayer.ID);
-        }
-        outgoingMessageHandler.SendValueToAllPlayers(TcpServer.ValueTypes.DISCONNECTED, id);
+        DeletePlayerDisplayers(id);
     }
 
 
@@ -227,9 +238,10 @@ public class PlayerHandler
     public void OnAbruptDisconnect()
     {
         Console.WriteLine("Player disconnected abruptly");
+        server.currentGameSession = TcpServer.GameSession.WAITING_TO_START;
+        outgoingMessageHandler?.BroadcastCommand(TcpServer.ServerCommands.FORCE_GAME_STOP);
+        // allow players to join again
+        server.currentGameState = TcpServer.GameState.WAITING_FOR_PLAYERS;
 
-        outgoingMessageHandler?.SendCommandToAllPlayers(
-            TcpServer.ServerCommands.FORCE_GAME_STOP
-        );
     }
 }

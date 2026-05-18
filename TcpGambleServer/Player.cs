@@ -46,6 +46,11 @@ public class Player
         cardsDrawn.Clear();
         publicCards.Clear();
     }
+
+    public void SetPlayerState(PlayerStates pState)
+    {
+        PlayerState = pState;
+    }
     
 
     public bool KnownsEnemy(int pEnemyID)

@@ -137,79 +137,64 @@ public class EnemyActionDisplayer : MonoBehaviour
         }
     }
 
-    public void OnReady()
+    private void PlayButtonAnimation(RectTransform rt)
     {
-        readyButtonRt.DOKill();
+        rt.DOComplete();
+        rt.DOKill();
+
+        Vector2 originalPos = rt.anchoredPosition;
+        Vector3 originalRot = rt.localEulerAngles;
+        Vector3 originalScale = rt.localScale;
 
         Sequence seq = DOTween.Sequence();
 
-        seq.Append(readyButtonRt.DOScale(0.97f, 0.06f).SetEase(Ease.OutQuad));
-        seq.Append(readyButtonRt.DOScale(1f, 0.1f).SetEase(Ease.OutQuad));
+        seq.Append(
+            rt.DOScale(0.97f, 0.06f)
+                .SetEase(Ease.OutQuad)
+        );
 
-        seq.Join(readyButtonRt.DOShakeRotation(
-            duration: 0.15f,
-            strength: new Vector3(0, 0, 3f),
-            vibrato: 12,
-            randomness: 90,
-            fadeOut: true
-        ));
+        seq.Append(
+            rt.DOScale(1f, 0.1f)
+                .SetEase(Ease.OutQuad)
+        );
 
+        seq.Join(
+            rt.DOShakeRotation(
+                duration: 0.15f,
+                strength: new Vector3(0, 0, 3f),
+                vibrato: 12,
+                randomness: 90,
+                fadeOut: true
+            )
+        );
+
+        seq.OnComplete(() =>
+        {
+            rt.anchoredPosition = originalPos;
+            rt.localEulerAngles = originalRot;
+            rt.localScale = originalScale;
+        });
+    }
+
+    public void OnReady()
+    {
+        PlayButtonAnimation(readyButtonRt);
         readyButtonText.text = "Ready";
     }
 
     public void OnUnready()
     {
-        readyButtonRt.DOKill();
-
-        Sequence seq = DOTween.Sequence();
-
-        seq.Append(readyButtonRt.DOScale(0.97f, 0.06f).SetEase(Ease.OutQuad));
-        seq.Append(readyButtonRt.DOScale(1f, 0.1f).SetEase(Ease.OutQuad));
-
-        seq.Join(readyButtonRt.DOShakeRotation(
-            duration: 0.15f,
-            strength: new Vector3(0, 0, 3f),
-            vibrato: 12,
-            randomness: 90,
-            fadeOut: true
-        ));
-
+        PlayButtonAnimation(readyButtonRt);
         readyButtonText.text = "Unready";
     }
 
     public void OnHit()
     {
-        hitButtonRt.DOKill();
-
-        Sequence seq = DOTween.Sequence();
-
-        seq.Append(hitButtonRt.DOScale(0.97f, 0.06f).SetEase(Ease.OutQuad));
-        seq.Append(hitButtonRt.DOScale(1f, 0.1f).SetEase(Ease.OutQuad));
-
-        seq.Join(hitButtonRt.DOShakeRotation(
-            duration: 0.15f,
-            strength: new Vector3(0, 0, 3f),
-            vibrato: 12,
-            randomness: 90,
-            fadeOut: true
-        ));
+        PlayButtonAnimation(hitButtonRt);
     }
 
     public void OnStand()
     {
-        standButtonRt.DOKill();
-
-        Sequence seq = DOTween.Sequence();
-
-        seq.Append(standButtonRt.DOScale(0.97f, 0.06f).SetEase(Ease.OutQuad));
-        seq.Append(standButtonRt.DOScale(1f, 0.1f).SetEase(Ease.OutQuad));
-
-        seq.Join(standButtonRt.DOShakeRotation(
-            duration: 0.15f,
-            strength: new Vector3(0, 0, 3f),
-            vibrato: 12,
-            randomness: 90,
-            fadeOut: true
-        ));
+        PlayButtonAnimation(standButtonRt);
     }
 }

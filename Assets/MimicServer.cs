@@ -15,7 +15,7 @@ public class MimicServer : MonoBehaviour
 		GAME_START,
 		WAITING_FOR_PLAYER_TURN,
 		END_TURN
-
+		
 
 	}
 	

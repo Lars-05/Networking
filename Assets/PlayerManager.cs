@@ -55,18 +55,7 @@ public class PlayerManager : MonoBehaviour
             enemyActionDisplayers.Remove(pId);
         }
     }
-
-
-
-    public void ClearPlayerDisplayersDecks()
-    {
-        foreach (var displayer in enemyActionDisplayers.Values)
-        {
-            displayer.ClearDeck();
-        }
-
-        thisPlayerActionManager.ClearDeck();
-    }
+    
 
     public void AddCardToPlayerDeck(int pId, int pCardId)
     {
@@ -230,10 +219,10 @@ public class PlayerManager : MonoBehaviour
 
     public void ResetGame()
     {
+        thisPlayerActionManager.Reset();
         foreach (var enemy in enemyActionDisplayers)
         {
             enemy.Value.Reset();
-            thisPlayerActionManager.Reset();
         }
     }
 

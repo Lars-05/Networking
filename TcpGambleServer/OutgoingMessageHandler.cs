@@ -11,6 +11,85 @@ public class OutgoingMessageHandler
         this.playerHandler = playerHandler;
     }
 
+    public void BroadcastCommand(TcpServer.ServerCommands command)
+    {
+        foreach (var player in playerHandler.GetPlayersSnapshot())
+        {
+            if (player == null || player.stream == null)
+                continue;
+
+            SendMessageToPlayer(player, command.ToString());
+        }
+    }
+
+    public void SetAndBroadcastPlayerState(Player player, PlayerStates state)
+    {
+        TcpServer.ValueTypes valueType = state switch
+        {
+            PlayerStates.IS_READY => TcpServer.ValueTypes.READY,
+            PlayerStates.IS_NOT_READY => TcpServer.ValueTypes.UNREADY,
+            PlayerStates.PLAYING_TURN => TcpServer.ValueTypes.STARTTURN,
+            PlayerStates.WAITING_FOR_TURN => TcpServer.ValueTypes.ENDTURN,
+            PlayerStates.OUT => TcpServer.ValueTypes.OUT,
+            _ => default
+        };
+
+        if (valueType == default)
+            return;
+
+        BroadcastValue(valueType, new[]{player.ID});
+    }
+
+    private string BuildValueMessage(TcpServer.ValueTypes valueType, params int[] data)
+    {
+        return valueType switch
+        {
+            TcpServer.ValueTypes.READY => $"READY_{data[0]}",
+            TcpServer.ValueTypes.UNREADY => $"UNREADY_{data[0]}",
+            TcpServer.ValueTypes.STARTTURN => $"STARTTURN_{data[0]}",
+            TcpServer.ValueTypes.ENDTURN => $"ENDTURN_{data[0]}",
+            TcpServer.ValueTypes.THISID => $"THISID_{data[0]}",
+            TcpServer.ValueTypes.ENEMYID=> $"ENEMYID_{data[0]}",
+            TcpServer.ValueTypes.HIT => $"HIT_{data[0]}",
+            TcpServer.ValueTypes.STAND => $"STAND_{data[0]}",
+            TcpServer.ValueTypes.CARD => $"CARD_{data[0]}_{data[1]}",
+            TcpServer.ValueTypes.SCORE => $"SCORE_{data[0]}_{data[1]}",
+            TcpServer.ValueTypes.OUT => $"OUT_{data[0]}",
+            TcpServer.ValueTypes.WINNER => $"WINNER_{data[0]}",
+            TcpServer.ValueTypes.DISCONNECTED => $"DISCONNECTED_{data[0]}",
+            _ => null
+        };
+    }
+
+    public void BroadcastValue(TcpServer.ValueTypes valueType, int[] data, Player? excludedPlayer = null)
+    {
+        string message = BuildValueMessage(valueType, data);
+        
+        if (message == null)
+            return;
+
+        foreach (var player in playerHandler.GetPlayersSnapshot())
+        {
+            if (player == null || player == excludedPlayer)
+                continue;
+
+            SendMessageToPlayer(player, message);
+        }
+    }
+
+    public void SendValueToPlayer(Player player, TcpServer.ValueTypes valueType, params int[] data)
+    {
+        string message = BuildValueMessage(valueType, data);
+
+        if (message == null)
+        {
+            Console.WriteLine("Invalid message type");
+            return;
+        }
+
+        SendMessageToPlayer(player, message);
+    }
+
     public void SendMessageToPlayer(Player player, string message)
     {
         if (player == null || player.stream == null)
@@ -27,157 +106,12 @@ public class OutgoingMessageHandler
         }
         catch
         {
-     
+
         }
     }
 
     public void SendCommandToPlayer(Player player, TcpServer.ServerCommands cmd)
     {
         SendMessageToPlayer(player, cmd.ToString());
-    }
-
-    public void SendCommandToAllPlayers(TcpServer.ServerCommands cmd, Player exception = null)
-    {
-        foreach (var player in playerHandler.GetPlayersSnapshot())
-        {
-            if (player == null || player == exception || player.stream == null)
-                continue;
-
-            SendCommandToPlayer(player, cmd);
-        }
-    }
-
-    public void SendValueToAllPlayers(TcpServer.ValueTypes type, int value, Player exception = null)
-    {
-        foreach (var player in playerHandler.GetPlayersSnapshot())
-        {
-            if (player == null || player == exception || player.stream == null)
-                continue;
-
-            ValueHandler(type, player, value);
-        }
-    }
-
-    public void SendScoreToAllPlayers()
-    {
-        var players = playerHandler.GetPlayersSnapshot();
-
-        foreach (var receiver in players)
-        {
-            foreach (var player in players)
-            {
-                SendMessageToPlayer(receiver,  $"SCORE_{player.ID}_{player.score}");
-              
-            }
-        }
-    }
-
-    public void SendCardToAllPlayers(Player owner, int value, Player exception = null)
-    {
-        foreach (var player in playerHandler.GetPlayersSnapshot())
-        {
-            if (player == null || player == exception || player.stream == null)
-                continue;
-
-            string message = $"CARD_{owner.ID}_{value}";
-            SendMessageToPlayer(player, message);
-        }
-    }
-
-    public void SendCardToPlayer(Player player, int cardValue)
-    {
-        if (player == null || player.stream == null)
-            return;
-
-        string message = $"CARD_{player.ID}_{cardValue}";
-        SendMessageToPlayer(player, message);
-    }
-
-
-    public void ValueHandler(TcpServer.ValueTypes type, Player targetPlayer, int subjectValue)
-    {
-        if (targetPlayer == null || targetPlayer.stream == null)
-            return;
-
-        string message;
-
-        switch (type)
-        {
-            case TcpServer.ValueTypes.READY:
-                message = $"READY_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.UNREADY:
-                message = $"UNREADY_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.STARTTURN:
-                message = $"STARTTURN_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.ENDTURN:
-                message = $"ENDTURN_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.HIT:
-                message = $"HIT_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.STAND:
-                message = $"STAND_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.CARD:
-                message = $"CARD_{targetPlayer.ID}_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.SCORE:
-                message = $"SCORE_{targetPlayer.ID}_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.OUT:
-                message = $"OUT_{subjectValue}";
-                break;
-            
-            case TcpServer.ValueTypes.WINNER:
-                message = $"WINNER_{subjectValue}";
-                break;
-            
-            case TcpServer.ValueTypes.DISCONNECTED:
-                message = $"DISCONNECTED_{subjectValue}";
-                break;
-
-            case TcpServer.ValueTypes.THISID:
-                SendMessageToPlayer(targetPlayer, $"THISID_{subjectValue}");
-
-                foreach (var player in playerHandler.GetPlayersSnapshot())
-                {
-                    if (player == targetPlayer)
-                        continue;
-
-                    if (!player.KnownsEnemy(subjectValue))
-                    {
-                        SendMessageToPlayer(player, $"ENEMYID_{subjectValue}");
-                        player.AddKnownEnemy(subjectValue);
-                    }
-
-                    if (!targetPlayer.KnownsEnemy(player.ID))
-                    {
-                        SendMessageToPlayer(targetPlayer, $"ENEMYID_{player.ID}");
-                        targetPlayer.AddKnownEnemy(player.ID);
-                    }
-                }
-                return;
-
-            case TcpServer.ValueTypes.ENEMYID:
-                message = $"ENEMYID_{subjectValue}";
-                targetPlayer.AddKnownEnemy(subjectValue);
-                break;
-
-            default:
-                return;
-        }
-
-        SendMessageToPlayer(targetPlayer, message);
     }
 }

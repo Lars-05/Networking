@@ -3,13 +3,13 @@ Shader "Unlit/ScrollingCheckerboard"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _SizeX("SizeX", Float) = 10.0
-        _SizeY ("SizeY", Float) = 10.0
+        _Size ("Size", Float) = 10.0
         _Color1 ("Color 1", Color) = (1,1,1,1)
         _Color2 ("Color 2", Color) = (0,0,0,1)
         _BorderColor ("Border Color", Color) = (0,0,0,1)
         _BorderThreshold ("Border Threshold", Float) = 1.0
         _ScrollingSpeed ("Scrolling Speed", Float) = 0.1
+        _Rotation ("Rotation (Radians)", Float) = 0
     }
 
     SubShader
@@ -27,13 +27,12 @@ Shader "Unlit/ScrollingCheckerboard"
             #include "UnityCG.cginc"
 
             float _ScrollingSpeed;
-            float _SizeX;
-            float _SizeY;
+            float _Size;
             float  _BorderThreshold;
             fixed4 _Color1;
             fixed4 _Color2;
             fixed4  _BorderColor;
-            
+            float _Rotation;
 
             struct appdata
             {
@@ -47,6 +46,17 @@ Shader "Unlit/ScrollingCheckerboard"
                 UNITY_FOG_COORDS(1)
                 float4 vertex : SV_POSITION;
             };
+
+            float2 RotateUV(float2 uv, float angle)
+            {
+                float s = sin(angle);
+                float c = cos(angle);
+
+                float2x2 rot = float2x2(c, -s,
+                                         s,  c);
+
+                return mul(rot, uv);
+            }
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
@@ -62,8 +72,11 @@ Shader "Unlit/ScrollingCheckerboard"
 
             fixed4 frag (v2f i) : SV_Target
             {
-                   float2 uv = i.uv + float2(_Time.y *_ScrollingSpeed, 0);
-                float2 Pos = floor(uv * float2(_SizeX, _SizeY));
+                float2 uv = i.uv + float2(_Time.y * _ScrollingSpeed, 0);
+                uv -= 0.5;
+                uv = RotateUV(uv, _Rotation);
+                uv += 0.5;
+                float2 Pos = floor(uv * _Size);
                 float PatternMask = fmod(Pos.x + Pos.y, 2.0) * 0.5;
                 
 

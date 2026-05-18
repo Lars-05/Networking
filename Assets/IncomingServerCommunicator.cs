@@ -26,7 +26,7 @@ public class IncomingServerCommunicator : MonoBehaviour
     {
         switch (message)
         {
-            case "FORCE_GAME_STOP":
+            case "FORCE_GAME_STOP": ;
                 playerManager.ResetGame();
             break;
             

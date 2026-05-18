@@ -51,7 +51,7 @@ public class ThisPlayerActionManager : MonoBehaviour
 
         readyButton.interactable = true;
         
-        readyButtonText.text = "Status: Unready";
+        OnUnReady(false);
         readyButton.interactable = true;
 
         hitButton.interactable = false;
@@ -127,7 +127,7 @@ public class ThisPlayerActionManager : MonoBehaviour
         hitButton.gameObject.SetActive(false);
         standButton.gameObject.SetActive(false);
         readyButton.gameObject.SetActive(true);
-        OnUnReady();
+        OnUnReady(false);
         scoreText.gameObject.SetActive(true);
         scoreText.text = "Score: " + score;
     }
@@ -144,29 +144,31 @@ public class ThisPlayerActionManager : MonoBehaviour
 
         if (isReady)
         {
-            OnReady();
+            OnReady(true);
         }
         else
         {
-            OnUnReady();
+            OnUnReady(true);
         }
     }
 
-    private void OnReady()
+    private void OnReady(bool call)
     {
         isReady = true;
-        EventBus.RaiseSendCommandToServer(
-            OutgoingServerCommunicator.ClientCommands.IS_READY);
         readyButtonText.text = "Status: Ready";
+        if (call) 
+            EventBus.RaiseSendCommandToServer(OutgoingServerCommunicator.ClientCommands.IS_READY);
+
     }
     
-    private void OnUnReady()
+    private void OnUnReady(bool call)
     {
         isReady = false;
-        EventBus.RaiseSendCommandToServer(
-            OutgoingServerCommunicator.ClientCommands.IS_NOT_READY);
-
         readyButtonText.text = "Status: Unready";
+        
+        if (call) 
+            EventBus.RaiseSendCommandToServer(OutgoingServerCommunicator.ClientCommands.IS_NOT_READY);
+
     }
 
     public void OnWin()
